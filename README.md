@@ -1,3 +1,5 @@
+# CURRENTLY NEEDS TESTING!!!
+
 ### Install Anaconda3
 Download the installer [https://www.anaconda.com/distribution/#linux](https://www.anaconda.com/distribution/#linux). 
 
@@ -23,3 +25,4 @@ Download the latest NVIDIA build from the main repository for Windows. [https://
 
 Extract the build and go into the _internal folder.
 Copy both pretrain_CelebA and pretrain_Quick96 to the directory DeepFaceLab_Linux/
+
