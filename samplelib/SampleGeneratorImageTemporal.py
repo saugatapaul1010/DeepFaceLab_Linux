@@ -1,10 +1,12 @@
 import traceback
-import numpy as np
+
 import cv2
+import numpy as np
 
-from utils import iter_utils
+from core.joblib import SubprocessGenerator, ThisThreadGenerator
+from samplelib import (SampleGeneratorBase, SampleLoader, SampleProcessor,
+                       SampleType)
 
-from samplelib import SampleType, SampleProcessor, SampleLoader, SampleGeneratorBase
 
 '''
 output_sample_types = [
@@ -44,7 +46,7 @@ class SampleGeneratorImageTemporal(SampleGeneratorBase):
 
         mult_max = 4
         samples_sub_len = samples_len - ( (self.temporal_image_count)*mult_max - (mult_max-1)  )
-        
+
         if samples_sub_len <= 0:
             raise ValueError('Not enough samples to fit temporal line.')
 
@@ -66,7 +68,7 @@ class SampleGeneratorImageTemporal(SampleGeneratorBase):
                 for i in range( self.temporal_image_count ):
                     sample = samples[ idx+i*mult ]
                     try:
-                        temporal_samples += SampleProcessor.process (sample, self.sample_process_options, self.output_sample_types, self.debug)
+                        temporal_samples += SampleProcessor.process ([sample], self.sample_process_options, self.output_sample_types, self.debug)[0]
                     except:
                         raise Exception ("Exception occured in sample %s. Error: %s" % (sample.filename, traceback.format_exc() ) )
 

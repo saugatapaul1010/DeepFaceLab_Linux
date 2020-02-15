@@ -8,14 +8,14 @@ import cv2
 import numpy as np
 import numpy.linalg as npl
 
-import imagelib
+from core import imagelib
+from DFLIMG import *
 from facelib import LandmarksProcessor
-from imagelib import IEPolys
-from interact import interact as io
-from utils import Path_utils
-from utils.cv2_utils import *
-from utils.DFLJPG import DFLJPG
-from utils.DFLPNG import DFLPNG
+from core.imagelib import IEPolys
+from core.interact import interact as io
+from core import pathex
+from core.cv2ex import *
+
 
 class MaskEditor:
     STATE_NONE=0
@@ -320,7 +320,14 @@ class MaskEditor:
     def get_ie_polys(self):
         return self.ie_polys
 
-def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
+    def set_ie_polys(self, saved_ie_polys):
+        self.state = self.STATE_NONE
+        self.ie_polys = saved_ie_polys
+        self.redo_to_end_point()
+        self.mask_finish()
+
+
+def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None, no_default_mask=False):
     input_path = Path(input_dir)
 
     confirmed_path = Path(confirmed_dir)
@@ -335,6 +342,11 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
     if not skipped_path.exists():
         skipped_path.mkdir(parents=True)
 
+    if not no_default_mask:
+        eyebrows_expand_mod = np.clip ( io.input_int ("Default eyebrows expand modifier?", 100, add_info="0..400"), 0, 400 ) / 100.0
+    else:
+        eyebrows_expand_mod = None
+
     wnd_name = "MaskEditor tool"
     io.named_window (wnd_name)
     io.capture_mouse(wnd_name)
@@ -342,11 +354,11 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
 
     cached_images = {}
 
-    image_paths = [ Path(x) for x in Path_utils.get_image_paths(input_path)]
+    image_paths = [ Path(x) for x in pathex.get_image_paths(input_path)]
     done_paths = []
     done_images_types = {}
     image_paths_total = len(image_paths)
-
+    saved_ie_polys = IEPolys()
     zoom_factor = 1.0
     preview_images_count = 9
     target_wh = 256
@@ -384,19 +396,14 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                     cached_images[path.name] = cv2_imread(str(path)) / 255.0
 
         if filepath is not None:
-            if filepath.suffix == '.png':
-                dflimg = DFLPNG.load( str(filepath) )
-            elif filepath.suffix == '.jpg':
-                dflimg = DFLJPG.load ( str(filepath) )
-            else:
-                dflimg = None
+            dflimg = DFLIMG.load (filepath)
 
             if dflimg is None:
                 io.log_err ("%s is not a dfl image file" % (filepath.name) )
                 continue
             else:
                 lmrks = dflimg.get_landmarks()
-                ie_polys = dflimg.get_ie_polys()
+                ie_polys = IEPolys.load(dflimg.get_ie_polys())
                 fanseg_mask = dflimg.get_fanseg_mask()
 
                 if filepath.name in cached_images:
@@ -407,7 +414,10 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                 if fanseg_mask is not None:
                     mask = fanseg_mask
                 else:
-                    mask = LandmarksProcessor.get_image_hull_mask( img.shape, lmrks)
+                    if no_default_mask:
+                        mask = np.zeros ( (target_wh,target_wh,3) )
+                    else:
+                        mask = LandmarksProcessor.get_image_hull_mask( img.shape, lmrks, eyebrows_expand_mod=eyebrows_expand_mod)
         else:
             img = np.zeros ( (target_wh,target_wh,3) )
             mask = np.ones ( (target_wh,target_wh,3) )
@@ -419,6 +429,7 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                     '[Right mouse button] - mark exclude mask.',
                     '[Middle mouse button] - finish current poly.',
                     '[Mouse wheel] - undo/redo poly or point. [+ctrl] - undo to begin/redo to end',
+                    '[r] - applies edits made to last saved image.',
                     '[q] - prev image. [w] - skip and move to %s. [e] - save and move to %s. ' % (skipped_path.name, confirmed_path.name),
                     '[z] - prev image. [x] - skip. [c] - save. ',
                     'hold [shift] - speed up the frame counter by 10.',
@@ -476,13 +487,17 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                         break
                     elif filepath is not None:
                         if chr_key == 'e':
+                            saved_ie_polys = ed.ie_polys
                             do_save_move_count = 1 if not shift_pressed else 10
                         elif chr_key == 'c':
+                            saved_ie_polys = ed.ie_polys
                             do_save_count = 1 if not shift_pressed else 10
                         elif chr_key == 'w':
                             do_skip_move_count = 1 if not shift_pressed else 10
                         elif chr_key == 'x':
                             do_skip_count = 1 if not shift_pressed else 10
+                        elif chr_key == 'r' and saved_ie_polys != None:
+                            ed.set_ie_polys(saved_ie_polys)
 
             if do_prev_count > 0:
                 do_prev_count -= 1
@@ -506,7 +521,7 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                     do_save_move_count -= 1
 
                     ed.mask_finish()
-                    dflimg.embed_and_set (str(filepath), ie_polys=ed.get_ie_polys() )
+                    dflimg.embed_and_set (str(filepath), ie_polys=ed.get_ie_polys(), eyebrows_expand_mod=eyebrows_expand_mod )
 
                     done_paths += [ confirmed_path / filepath.name ]
                     done_images_types[filepath.name] = 2
@@ -517,7 +532,7 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
                     do_save_count -= 1
 
                     ed.mask_finish()
-                    dflimg.embed_and_set (str(filepath), ie_polys=ed.get_ie_polys() )
+                    dflimg.embed_and_set (str(filepath), ie_polys=ed.get_ie_polys(), eyebrows_expand_mod=eyebrows_expand_mod )
 
                     done_paths += [ filepath ]
                     done_images_types[filepath.name] = 2
@@ -553,4 +568,3 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
         io.process_messages(0.005)
 
     io.destroy_all_windows()
-
