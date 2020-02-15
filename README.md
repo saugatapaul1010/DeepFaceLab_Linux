@@ -21,8 +21,7 @@ python -m pip install -r requirements-cuda.txt
 ```
 
 ## Download CelebA Dataset
-Download the latest NVIDIA build from the main repository for Windows. [https://drive.google.com/drive/folders/17a9b9zmLdnAlItifcGSE9ixDIDAT3YxP](https://drive.google.com/drive/folders/17a9b9zmLdnAlItifcGSE9ixDIDAT3YxP)
-
-Extract the build and go into the _internal folder.
-Copy both pretrain_CelebA and pretrain_Quick96 to the directory DeepFaceLab_Linux/
+1. Download the latest NVIDIA build from the main repository for Windows. [https://drive.google.com/drive/folders/17a9b9zmLdnAlItifcGSE9ixDIDAT3YxP](https://drive.google.com/drive/folders/17a9b9zmLdnAlItifcGSE9ixDIDAT3YxP)
+2. Extract the build and go into the _internal folder.
+3. Copy both pretrain_CelebA and pretrain_Quick96 to the directory DeepFaceLab_Linux/
 
